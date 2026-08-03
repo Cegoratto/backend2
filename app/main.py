@@ -9,6 +9,7 @@ from app.api.routes import ai, auth, boards, cards, columns, profiles
 from app.core.config import get_settings
 from app.db.base import Base
 from app.db.session import engine
+from app.db.sqlite_migrations import migrate_users_password_hash_nullable
 from app.models import Board, BoardColumn, BoardMember, Card, User  # noqa: F401
 from app.schemas.common import ErrorResponse
 
@@ -18,6 +19,7 @@ settings = get_settings()
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     if settings.database_url.startswith("sqlite"):
+        migrate_users_password_hash_nullable(settings.database_url)
         async with engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)
     yield

@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.deps import get_current_user
 from app.db.session import get_db
 from app.models.user import User
-from app.schemas.auth import AuthResponse, LoginRequest, RegisterRequest, UserOut
+from app.schemas.auth import AuthResponse, GoogleAuthRequest, LoginRequest, RegisterRequest, UserOut
 from app.services.auth_service import AuthService
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
@@ -27,6 +27,14 @@ async def login(
     session: Annotated[AsyncSession, Depends(get_db)],
 ) -> AuthResponse:
     return await AuthService(session).login(payload)
+
+
+@router.post("/google", response_model=AuthResponse)
+async def google_auth(
+    payload: GoogleAuthRequest,
+    session: Annotated[AsyncSession, Depends(get_db)],
+) -> AuthResponse:
+    return await AuthService(session).google_login(payload.idToken)
 
 
 @router.get("/me", response_model=UserOut)

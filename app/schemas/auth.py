@@ -22,6 +22,10 @@ class LoginRequest(BaseModel):
     password: str = Field(min_length=1, max_length=128)
 
 
+class GoogleAuthRequest(BaseModel):
+    idToken: str = Field(min_length=1)
+
+
 class AuthResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"

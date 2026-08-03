@@ -8,7 +8,7 @@ Python-бэкенд для Kanban-приложения. Заменяет Supabas
 
 - FastAPI
 - SQLAlchemy 2.x (async)
-- JWT auth (email/password)
+- JWT auth (email/password + Google OAuth)
 - OpenRouter для AI
 - SQLite (dev) или PostgreSQL (prod)
 
@@ -35,7 +35,10 @@ copy .env.example .env
 DATABASE_URL=sqlite+aiosqlite:///./data/kanban.db
 OPENROUTER_API_KEY=sk-or-...   # из backend/.dev.vars
 JWT_SECRET=случайная-длинная-строка
+GOOGLE_CLIENT_ID=your-google-client-id.apps.googleusercontent.com
 ```
+
+`GOOGLE_CLIENT_ID` — Web Client ID из Google Cloud Console (тот же, что `VITE_GOOGLE_CLIENT_ID` на фронтенде). Client Secret не нужен.
 
 Для PostgreSQL замените `DATABASE_URL` и выполните `alembic upgrade head`.
 
@@ -88,7 +91,8 @@ pytest
 | Метод | Путь | Описание |
 |-------|------|----------|
 | POST | `/api/auth/register` | Регистрация |
-| POST | `/api/auth/login` | Вход |
+| POST | `/api/auth/login` | Вход по email/password |
+| POST | `/api/auth/google` | Вход через Google (`{ "idToken": "..." }`) |
 | GET | `/api/auth/me` | Текущий пользователь |
 
 ### Profiles
@@ -159,4 +163,6 @@ Vite proxy: `/api` → `http://localhost:8000`
 | `connection refused` :5432 | Используйте SQLite или запустите PostgreSQL |
 | `database "kanban" does not exist` | `psql -U postgres -c "CREATE DATABASE kanban;"` |
 | `401 Unauthorized` | Войдите заново — JWT мог истечь |
+| `503 Google sign-in is not configured` | Добавить `GOOGLE_CLIENT_ID` в `.env` |
+| `Missing required parameter: client_id` (Google) | Настроить `VITE_GOOGLE_CLIENT_ID` на фронтенде и перезапустить dev-сервер |
 | Пустой список пользователей | Запустите `scripts/seed_users.py` |

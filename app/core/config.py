@@ -12,6 +12,7 @@ class Settings(BaseSettings):
     jwt_algorithm: str = "HS256"
     openrouter_api_key: str = ""
     cors_origins: str = "http://localhost:5173,http://127.0.0.1:5173"
+    google_client_id: str = ""
 
     @property
     def cors_origin_list(self) -> list[str]:

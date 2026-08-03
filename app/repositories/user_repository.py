@@ -21,11 +21,20 @@ class UserRepository:
         result = await self.session.execute(select(User).order_by(User.name))
         return list(result.scalars().all())
 
-    async def create(self, email: str, password_hash: str, name: str, team_role: str) -> User:
+    async def create(
+        self,
+        email: str,
+        name: str,
+        password_hash: str | None = None,
+        team_role: str | None = None,
+    ) -> User:
         user = User(email=email, password_hash=password_hash, name=name, team_role=team_role)
         self.session.add(user)
         await self.session.flush()
         return user
+
+    async def create_oauth_user(self, email: str, name: str) -> User:
+        return await self.create(email=email, name=name, password_hash=None, team_role=None)
 
     async def update_team_role(self, user: User, team_role: str) -> User:
         user.team_role = team_role
