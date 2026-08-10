@@ -19,6 +19,11 @@ def configure_env(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("JWT_SECRET", "test-secret-key")
     monkeypatch.setenv("OPENROUTER_API_KEY", "test-openrouter-key")
     monkeypatch.setenv("CORS_ORIGINS", "http://localhost:5173")
+    monkeypatch.setenv("FRONTEND_URL", "http://localhost:5173")
+    monkeypatch.setenv("STRIPE_SECRET_KEY", "sk_test_fake")
+    monkeypatch.setenv("STRIPE_WEBHOOK_SECRET", "whsec_test")
+    monkeypatch.setenv("STRIPE_PRICE_ID_PRO", "price_test_pro")
+    monkeypatch.setenv("STRIPE_PRICE_ID_TEAM", "price_test_team")
     get_settings.cache_clear()
 
 

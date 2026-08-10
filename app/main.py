@@ -5,12 +5,12 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse, PlainTextResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
-from app.api.routes import ai, auth, boards, cards, columns, profiles
+from app.api.routes import ai, auth, billing, boards, cards, columns, profiles
 from app.core.config import get_settings
 from app.db.base import Base
 from app.db.session import engine
-from app.db.sqlite_migrations import migrate_users_password_hash_nullable
-from app.models import Board, BoardColumn, BoardMember, Card, User  # noqa: F401
+from app.db.sqlite_migrations import migrate_billing, migrate_stripe, migrate_users_password_hash_nullable
+from app.models import Board, BoardColumn, BoardMember, Card, Payment, User  # noqa: F401
 from app.schemas.common import ErrorResponse
 
 settings = get_settings()
@@ -20,6 +20,8 @@ settings = get_settings()
 async def lifespan(_: FastAPI):
     if settings.database_url.startswith("sqlite"):
         migrate_users_password_hash_nullable(settings.database_url)
+        migrate_billing(settings.database_url)
+        migrate_stripe(settings.database_url)
         async with engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)
     yield
@@ -85,6 +87,7 @@ async def root() -> PlainTextResponse:
 
 app.include_router(auth.router)
 app.include_router(profiles.router)
+app.include_router(billing.router)
 app.include_router(boards.router)
 app.include_router(columns.router)
 app.include_router(cards.router)

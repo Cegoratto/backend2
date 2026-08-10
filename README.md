@@ -125,7 +125,47 @@ pytest
 | POST | `/api/ask` |
 | POST | `/api/tasks/decompose-and-assign` |
 
+### Billing (Stripe)
+
+| Метод | Путь | Описание |
+|-------|------|----------|
+| GET | `/api/billing/plans` | Список тарифов |
+| GET | `/api/billing/subscription` | Текущая подписка |
+| POST | `/api/billing/checkout` | Создать Stripe Checkout Session |
+| POST | `/api/billing/subscribe` | Переход на Free (отмена подписки) |
+| GET | `/api/billing/payments` | История платежей |
+| POST | `/api/billing/webhook` | Webhook Stripe (без JWT) |
+
 Все защищённые эндпоинты требуют `Authorization: Bearer <token>`.
+
+## Stripe
+
+Добавьте в `.env`:
+
+```env
+FRONTEND_URL=http://localhost:5173
+STRIPE_SECRET_KEY=sk_test_...
+STRIPE_WEBHOOK_SECRET=whsec_...
+STRIPE_PRICE_ID_PRO=price_...
+STRIPE_PRICE_ID_TEAM=price_...
+```
+
+### Webhook (production)
+
+1. Stripe Dashboard → Developers → Webhooks → Add endpoint
+2. URL: `https://slava.vevi.monster/api/billing/webhook`
+3. События: `checkout.session.completed`, `customer.subscription.updated`, `customer.subscription.deleted`, `invoice.paid`
+4. Скопируйте Signing secret в `STRIPE_WEBHOOK_SECRET`
+
+### Локальная разработка
+
+```powershell
+stripe listen --forward-to localhost:8000/api/billing/webhook
+```
+
+CLI выдаст временный `whsec_...` для `.env`.
+
+Тестовая карта: `4242 4242 4242 4242`.
 
 ## Подключение фронтенда
 
