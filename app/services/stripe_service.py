@@ -1,20 +1,48 @@
 import uuid
+from pathlib import Path
 
 import stripe
 from fastapi import HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.config import Settings, get_settings
+from app.core.config import BASE_DIR, Settings
 from app.models.payment import Payment
 from app.models.user import User
 from app.services.billing_service import PLANS
 
 
+def _read_env_value(env_path: Path, key: str) -> str:
+    if not env_path.exists():
+        return ""
+
+    for line in env_path.read_text(encoding="utf-8").splitlines():
+        stripped = line.strip()
+        if not stripped or stripped.startswith("#") or "=" not in stripped:
+            continue
+        env_key, env_value = stripped.split("=", 1)
+        if env_key.strip() == key:
+            return env_value.strip()
+    return ""
+
+
 class StripeService:
     def __init__(self, session: AsyncSession, settings: Settings | None = None) -> None:
         self.session = session
-        self.settings = settings or get_settings()
+        self.settings = settings or Settings()
+        env_path = BASE_DIR / ".env"
+
+        if not self.settings.stripe_secret_key:
+            self.settings.stripe_secret_key = _read_env_value(env_path, "STRIPE_SECRET_KEY")
+        if not self.settings.stripe_price_id_pro:
+            self.settings.stripe_price_id_pro = _read_env_value(env_path, "STRIPE_PRICE_ID_PRO")
+        if not self.settings.stripe_price_id_team:
+            self.settings.stripe_price_id_team = _read_env_value(env_path, "STRIPE_PRICE_ID_TEAM")
+        if not self.settings.stripe_webhook_secret:
+            self.settings.stripe_webhook_secret = _read_env_value(env_path, "STRIPE_WEBHOOK_SECRET")
+        if not self.settings.frontend_url:
+            self.settings.frontend_url = _read_env_value(env_path, "FRONTEND_URL")
+
         stripe.api_key = self.settings.stripe_secret_key
 
     def _plan_to_price_id(self, plan_id: str) -> str:

@@ -160,7 +160,21 @@ STRIPE_PRICE_ID_TEAM=price_...
 ### Локальная разработка
 
 ```powershell
-stripe listen --forward-to localhost:8000/api/billing/webhook
+# Терминал 1 — бэкенд (рекомендуется порт 8001, если на 8000 остались старые процессы)
+cd backend2
+.\.venv\Scripts\python.exe -m uvicorn app.main:app --port 8001
+
+# Терминал 2 — фронтенд
+cd second_project
+npm run dev:local
+```
+
+Фронтенд в режиме `dev:local` обращается к `VITE_API_BASE_URL` из `.env.dev-local` (по умолчанию `http://127.0.0.1:8001`).
+
+Webhook для локального бэкенда на порту 8001:
+
+```powershell
+stripe listen --forward-to localhost:8001/api/billing/webhook
 ```
 
 CLI выдаст временный `whsec_...` для `.env`.
@@ -179,7 +193,7 @@ cd backend2 && uvicorn app.main:app --reload --port 8000
 cd second_project && npm run dev
 ```
 
-Vite proxy: `/api` → `http://localhost:8000`
+Альтернатива без Vite proxy: задайте `VITE_API_BASE_URL=http://127.0.0.1:8001` в `second_project/.env.dev-local`.
 
 ## PostgreSQL (опционально)
 
@@ -204,5 +218,7 @@ Vite proxy: `/api` → `http://localhost:8000`
 | `database "kanban" does not exist` | `psql -U postgres -c "CREATE DATABASE kanban;"` |
 | `401 Unauthorized` | Войдите заново — JWT мог истечь |
 | `503 Google sign-in is not configured` | Добавить `GOOGLE_CLIENT_ID` в `.env` |
+| `503 Stripe is not configured` | Добавить Stripe-переменные в `backend2/.env` и перезапустить бэкенд |
+| `503` на checkout при запущенном бэкенде | На `:8000` могут висеть старые `uvicorn`-процессы — запустите бэкенд на `:8001` и укажите `VITE_API_BASE_URL=http://127.0.0.1:8001` |
 | `Missing required parameter: client_id` (Google) | Настроить `VITE_GOOGLE_CLIENT_ID` на фронтенде и перезапустить dev-сервер |
 | Пустой список пользователей | Запустите `scripts/seed_users.py` |
