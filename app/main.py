@@ -7,6 +7,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app.api.routes import ai, auth, billing, boards, cards, columns, profiles
 from app.core.config import get_settings
+from app.core.cors import is_allowed_origin
 from app.db.base import Base
 from app.db.session import engine
 from app.db.sqlite_migrations import migrate_billing, migrate_stripe, migrate_users_password_hash_nullable
@@ -30,18 +31,10 @@ async def lifespan(_: FastAPI):
 app = FastAPI(title="Kanban Backend", version="1.0.0", lifespan=lifespan)
 
 
-def _is_allowed_origin(origin: str | None) -> bool:
-    if not origin:
-        return False
-    if origin in settings.cors_origin_list:
-        return True
-    return origin.endswith(".pages.dev")
-
-
 @app.middleware("http")
 async def cors_middleware(request: Request, call_next):
     origin = request.headers.get("origin")
-    allowed_origin = origin if _is_allowed_origin(origin) else "*"
+    allowed_origin = origin if is_allowed_origin(origin, settings) else "*"
 
     if request.method == "OPTIONS" and request.url.path.startswith("/api"):
         return PlainTextResponse(

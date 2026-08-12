@@ -20,10 +20,15 @@ class SubscribeRequest(BaseModel):
 
 class CheckoutRequest(BaseModel):
     planId: str = Field(min_length=1, max_length=20)
+    returnBaseUrl: str | None = None
 
 
 class CheckoutOut(BaseModel):
     checkoutUrl: str
+
+
+class CheckoutConfirmRequest(BaseModel):
+    sessionId: str = Field(min_length=1)
 
 
 class PaymentOut(BaseModel):

@@ -195,6 +195,53 @@ cd second_project && npm run dev
 
 Альтернатива без Vite proxy: задайте `VITE_API_BASE_URL=http://127.0.0.1:8001` в `second_project/.env.dev-local`.
 
+## Деплой на DigitalOcean (slava.vevi.monster)
+
+Дроплет: `165.227.147.62` (SSH host: `second-project` в `~/.ssh/config`).
+
+Бэкенд уже отвечает на `http://165.227.147.62:8000`. Если `https://slava.vevi.monster` отдаёт **521** — Cloudflare не достучался до origin на порту 80. Нужен nginx как reverse proxy.
+
+### Быстрый фикс (через консоль DigitalOcean)
+
+1. [DigitalOcean](https://cloud.digitalocean.com/) → Droplets → ваш дроплет → **Access** → **Launch Droplet Console**
+2. Войдите как `root`
+3. Выполните:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/Cegoratto/backend2/main/deploy/bootstrap_nginx.sh | bash
+```
+
+Или скопируйте содержимое `deploy/bootstrap_nginx.sh` вручную.
+
+4. В **Cloudflare** → SSL/TLS → режим **Flexible** (или **Full** после certbot)
+
+### Полный деплой (через SSH)
+
+```powershell
+# На дроплете (первый раз)
+ssh second-project
+curl -fsSL https://raw.githubusercontent.com/Cegoratto/backend2/main/deploy/setup_server.sh | bash
+nano /opt/kanban-backend/.env   # секреты из локального .env
+systemctl restart kanban-backend
+```
+
+Скопируйте в `/opt/kanban-backend/.env` на сервере:
+
+- `JWT_SECRET`, `OPENROUTER_API_KEY`, `GOOGLE_CLIENT_ID`
+- Stripe-переменные
+- `CORS_ORIGINS` — добавьте URL фронтенда (например `https://your-app.pages.dev`)
+- `FRONTEND_URL` — публичный URL фронтенда
+
+Обновление после `git push`:
+
+```bash
+ssh second-project 'cd /opt/kanban-backend && git pull && .venv/bin/pip install -r requirements.txt && systemctl restart kanban-backend'
+```
+
+### SSH-доступ
+
+Если `Permission denied (publickey)` — добавьте свой публичный ключ в DigitalOcean → Droplet → **Settings** → **Security** → **Add SSH Key**, или вставьте ключ в `/root/.ssh/authorized_keys` через веб-консоль.
+
 ## PostgreSQL (опционально)
 
 1. Установить PostgreSQL: https://www.postgresql.org/download/windows/
@@ -209,6 +256,9 @@ cd second_project && npm run dev
 | `scripts/seed_users.py` | 10 тестовых пользователей |
 | `scripts/setup_db.bat` | Создание БД kanban (PostgreSQL) |
 | `scripts/create_database.sql` | SQL для создания БД |
+| `deploy/setup_server.sh` | Первичная настройка дроплета |
+| `deploy/bootstrap_nginx.sh` | Только nginx → :8000 (фикс Cloudflare 521) |
+| `deploy/deploy.sh` | Обновление после git pull |
 
 ## Устранение проблем
 
@@ -222,3 +272,4 @@ cd second_project && npm run dev
 | `503` на checkout при запущенном бэкенде | На `:8000` могут висеть старые `uvicorn`-процессы — запустите бэкенд на `:8001` и укажите `VITE_API_BASE_URL=http://127.0.0.1:8001` |
 | `Missing required parameter: client_id` (Google) | Настроить `VITE_GOOGLE_CLIENT_ID` на фронтенде и перезапустить dev-сервер |
 | Пустой список пользователей | Запустите `scripts/seed_users.py` |
+| Cloudflare **521** на slava.vevi.monster | Запустите `deploy/bootstrap_nginx.sh` на дроплете |

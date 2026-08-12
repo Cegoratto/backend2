@@ -7,6 +7,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import BASE_DIR, Settings
+from app.core.cors import is_allowed_origin
 from app.models.payment import Payment
 from app.models.user import User
 from app.services.billing_service import PLANS
@@ -87,7 +88,23 @@ class StripeService:
         await self.session.refresh(user)
         return customer.id
 
-    async def create_checkout_session(self, user: User, plan_id: str) -> str:
+    def _resolve_frontend_url(self, return_base_url: str | None) -> str:
+        if return_base_url:
+            normalized = return_base_url.rstrip("/")
+            if not is_allowed_origin(normalized, self.settings):
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Invalid return URL",
+                )
+            return normalized
+        return self.settings.frontend_url.rstrip("/")
+
+    async def create_checkout_session(
+        self,
+        user: User,
+        plan_id: str,
+        return_base_url: str | None = None,
+    ) -> str:
         self._ensure_configured()
 
         if plan_id not in {"pro", "team"}:
@@ -101,13 +118,13 @@ class StripeService:
 
         customer_id = await self.get_or_create_customer(user)
         price_id = self._plan_to_price_id(plan_id)
-        frontend_url = self.settings.frontend_url.rstrip("/")
+        frontend_url = self._resolve_frontend_url(return_base_url)
 
         session = stripe.checkout.Session.create(
             customer=customer_id,
             mode="subscription",
             line_items=[{"price": price_id, "quantity": 1}],
-            success_url=f"{frontend_url}/billing?checkout=success",
+            success_url=f"{frontend_url}/billing?checkout=success&session_id={{CHECKOUT_SESSION_ID}}",
             cancel_url=f"{frontend_url}/billing?checkout=cancel",
             metadata={"user_id": str(user.id), "plan_id": plan_id},
             subscription_data={"metadata": {"user_id": str(user.id), "plan_id": plan_id}},
@@ -120,6 +137,54 @@ class StripeService:
             )
 
         return session.url
+
+    async def confirm_checkout_session(self, user: User, session_id: str) -> None:
+        self._ensure_configured()
+
+        try:
+            session = stripe.checkout.Session.retrieve(session_id)
+        except stripe.error.InvalidRequestError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Checkout session not found",
+            ) from exc
+
+        session_customer = session.get("customer")
+        metadata = session.get("metadata") or {}
+        metadata_user_id = metadata.get("user_id")
+
+        if metadata_user_id:
+            owner = await self._get_user_by_id(metadata_user_id)
+            if owner is None or owner.id != user.id:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Checkout session does not belong to this user",
+                )
+        elif user.stripe_customer_id:
+            if session_customer != user.stripe_customer_id:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Checkout session does not belong to this user",
+                )
+        else:
+            owner = await self._get_user_by_customer_id(session_customer)
+            if owner is None or owner.id != user.id:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Checkout session does not belong to this user",
+                )
+
+        if session_customer and not user.stripe_customer_id:
+            user.stripe_customer_id = session_customer
+
+        if session.get("status") != "complete":
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Checkout is not complete yet",
+            )
+
+        await self._handle_checkout_completed(dict(session))
+        await self.session.commit()
 
     async def cancel_subscription(self, user: User) -> None:
         self._ensure_configured()

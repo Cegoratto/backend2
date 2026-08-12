@@ -61,6 +61,75 @@ async def test_checkout_returns_stripe_url(
 
 
 @pytest.mark.asyncio
+@patch("app.services.stripe_service.stripe.checkout.Session.create")
+@patch("app.services.stripe_service.stripe.Customer.create")
+async def test_checkout_uses_return_base_url(
+    mock_customer_create: MagicMock,
+    mock_session_create: MagicMock,
+    client: AsyncClient,
+    auth_headers: dict[str, str],
+):
+    mock_customer_create.return_value = MagicMock(id="cus_test_123")
+    mock_session_create.return_value = MagicMock(url="https://checkout.stripe.com/test")
+
+    response = await client.post(
+        "/api/billing/checkout",
+        headers=auth_headers,
+        json={"planId": "pro", "returnBaseUrl": "http://localhost:5174"},
+    )
+
+    assert response.status_code == 200
+    call_kwargs = mock_session_create.call_args.kwargs
+    assert call_kwargs["success_url"] == "http://localhost:5174/billing?checkout=success&session_id={CHECKOUT_SESSION_ID}"
+    assert call_kwargs["cancel_url"] == "http://localhost:5174/billing?checkout=cancel"
+
+
+@pytest.mark.asyncio
+@patch("app.services.stripe_service.stripe.checkout.Session.retrieve")
+@patch("app.services.stripe_service.stripe.checkout.Session.create")
+@patch("app.services.stripe_service.stripe.Customer.create")
+async def test_confirm_checkout_updates_subscription(
+    mock_customer_create: MagicMock,
+    mock_session_create: MagicMock,
+    mock_session_retrieve: MagicMock,
+    client: AsyncClient,
+    auth_headers: dict[str, str],
+):
+    mock_customer_create.return_value = MagicMock(id="cus_test_123")
+    mock_session_create.return_value = MagicMock(url="https://checkout.stripe.com/test")
+    mock_session_retrieve.return_value = {
+        "id": "cs_test_confirm",
+        "customer": "cus_test_123",
+        "subscription": "sub_test_confirm",
+        "status": "complete",
+        "metadata": {"plan_id": "pro"},
+    }
+
+    checkout_response = await client.post(
+        "/api/billing/checkout",
+        headers=auth_headers,
+        json={"planId": "pro"},
+    )
+    assert checkout_response.status_code == 200
+
+    response = await client.post(
+        "/api/billing/checkout/confirm",
+        headers=auth_headers,
+        json={"sessionId": "cs_test_confirm"},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["planId"] == "pro"
+
+    subscription_response = await client.get("/api/billing/subscription", headers=auth_headers)
+    assert subscription_response.json()["planId"] == "pro"
+
+    payments_response = await client.get("/api/billing/payments", headers=auth_headers)
+    assert len(payments_response.json()) == 1
+    assert payments_response.json()[0]["planId"] == "pro"
+
+
+@pytest.mark.asyncio
 @patch("app.services.stripe_service.stripe.Subscription.cancel")
 async def test_subscribe_to_free_creates_payment(
     mock_subscription_cancel: MagicMock,

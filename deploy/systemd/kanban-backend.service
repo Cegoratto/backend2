@@ -1,0 +1,15 @@
+[Unit]
+Description=Kanban FastAPI Backend
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/kanban-backend
+EnvironmentFile=/opt/kanban-backend/.env
+ExecStart=/opt/kanban-backend/.venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8000
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target
