@@ -16,6 +16,9 @@ def is_allowed_origin(origin: str | None, settings: Settings | None = None) -> b
     if normalized.endswith(".pages.dev"):
         return True
 
+    if normalized.endswith(".workers.dev"):
+        return True
+
     if normalized == cfg.frontend_url.rstrip("/"):
         return True
 

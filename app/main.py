@@ -67,9 +67,20 @@ async def http_exception_handler(_: Request, exc: StarletteHTTPException):
 
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(_: Request, exc: RequestValidationError):
+    message = "Request body must be valid JSON"
+    for error in exc.errors():
+        if error.get("type") == "json_invalid":
+            break
+        if error.get("loc") == ("body",):
+            message = str(error.get("msg", message))
+            break
+        if error.get("loc") and error["loc"][-1] in {"idToken", "accessToken", "email", "password", "teamRole", "name"}:
+            message = str(error.get("msg", message))
+            break
+
     return JSONResponse(
         status_code=400,
-        content=ErrorResponse(error="Request body must be valid JSON").model_dump(),
+        content=ErrorResponse(error=message).model_dump(),
     )
 
 
