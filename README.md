@@ -53,6 +53,23 @@ API: http://localhost:8000
 
 Таблицы SQLite создаются автоматически при старте.
 
+### Telegram-бот (ответ `ok`)
+
+1. Добавьте токен бота в `backend2/.env`:
+
+```env
+TELEGRAM_BOT_TOKEN=123456789:your-real-token
+```
+
+2. Запустите бота отдельным процессом:
+
+```powershell
+cd backend2
+.\.venv\Scripts\python.exe scripts\telegram_bot.py
+```
+
+Бот отвечает `ok` на любое входящее сообщение.
+
 ### 4. Тестовые пользователи
 
 ```powershell

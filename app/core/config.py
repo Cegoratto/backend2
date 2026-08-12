@@ -18,6 +18,7 @@ class Settings(BaseSettings):
     jwt_expire_minutes: int = 1440
     jwt_algorithm: str = "HS256"
     openrouter_api_key: str = ""
+    telegram_bot_token: str = ""
     cors_origins: str = "http://localhost:5173,http://127.0.0.1:5173"
     google_client_id: str = ""
     frontend_url: str = "http://localhost:5173"
