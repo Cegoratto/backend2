@@ -1,4 +1,4 @@
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr, Field, model_validator
 
 
 class UserOut(BaseModel):
@@ -23,7 +23,16 @@ class LoginRequest(BaseModel):
 
 
 class GoogleAuthRequest(BaseModel):
-    idToken: str = Field(min_length=1)
+    idToken: str | None = Field(default=None, min_length=1)
+    accessToken: str | None = Field(default=None, min_length=1)
+
+    @model_validator(mode="after")
+    def validate_token(self) -> "GoogleAuthRequest":
+        if not self.idToken and not self.accessToken:
+            raise ValueError("Either idToken or accessToken is required")
+        if self.idToken and self.accessToken:
+            raise ValueError("Provide only one of idToken or accessToken")
+        return self
 
 
 class AuthResponse(BaseModel):

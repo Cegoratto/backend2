@@ -34,7 +34,7 @@ async def google_auth(
     payload: GoogleAuthRequest,
     session: Annotated[AsyncSession, Depends(get_db)],
 ) -> AuthResponse:
-    return await AuthService(session).google_login(payload.idToken)
+    return await AuthService(session).google_login(payload)
 
 
 @router.get("/me", response_model=UserOut)

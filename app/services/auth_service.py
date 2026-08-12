@@ -1,5 +1,6 @@
 from uuid import UUID
 
+import httpx
 from fastapi import HTTPException, status
 from google.auth.transport import requests
 from google.oauth2 import id_token
@@ -9,7 +10,7 @@ from app.core.config import get_settings
 from app.core.security import create_access_token, hash_password, verify_password
 from app.models.user import User
 from app.repositories.user_repository import UserRepository
-from app.schemas.auth import AuthResponse, LoginRequest, RegisterRequest, UserOut
+from app.schemas.auth import AuthResponse, GoogleAuthRequest, LoginRequest, RegisterRequest, UserOut
 
 
 def user_to_out(user: User) -> UserOut:
@@ -60,7 +61,7 @@ class AuthService:
         token = create_access_token(user.id)
         return AuthResponse(access_token=token, user=user_to_out(user))
 
-    async def google_login(self, raw_id_token: str) -> AuthResponse:
+    async def google_login(self, payload: GoogleAuthRequest) -> AuthResponse:
         settings = get_settings()
         if not settings.google_client_id:
             raise HTTPException(
@@ -68,11 +69,19 @@ class AuthService:
                 detail="Google sign-in is not configured",
             )
 
+        if payload.idToken:
+            id_info = self._verify_google_id_token(payload.idToken, settings.google_client_id)
+        else:
+            id_info = await self._fetch_google_userinfo(payload.accessToken or "")
+
+        return await self._login_google_user(id_info)
+
+    def _verify_google_id_token(self, raw_id_token: str, client_id: str) -> dict:
         try:
-            id_info = id_token.verify_oauth2_token(
+            return id_token.verify_oauth2_token(
                 raw_id_token,
                 requests.Request(),
-                settings.google_client_id,
+                client_id,
             )
         except ValueError:
             raise HTTPException(
@@ -80,6 +89,29 @@ class AuthService:
                 detail="Invalid Google token",
             )
 
+    async def _fetch_google_userinfo(self, access_token: str) -> dict:
+        async with httpx.AsyncClient() as client:
+            response = await client.get(
+                "https://www.googleapis.com/oauth2/v3/userinfo",
+                headers={"Authorization": f"Bearer {access_token}"},
+                timeout=10.0,
+            )
+
+        if response.status_code != 200:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid Google token",
+            )
+
+        userinfo = response.json()
+        return {
+            "email": userinfo.get("email"),
+            "email_verified": userinfo.get("verified_email", False),
+            "name": userinfo.get("name"),
+            "given_name": userinfo.get("given_name"),
+        }
+
+    async def _login_google_user(self, id_info: dict) -> AuthResponse:
         email = id_info.get("email")
         if not email:
             raise HTTPException(
